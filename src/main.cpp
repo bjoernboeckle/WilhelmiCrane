@@ -9,7 +9,7 @@
 #include "esp_err.h"
 
 
-#define HOST_PS4_ADDRESS     "c8:c9:a3:c5:dc:46"
+#define HOST_PS4_ADDRESS     "2c:9e:00:e9:c0:3e"
 
 // Unused
 //#define LED_RED                23
@@ -23,9 +23,10 @@
 #define LED_BLUE                 12
 
 // UNUSED_LEFT_TORIGHT           33
-// UNUSED_LEFT_TORIGHT           25
-// UNUSED_LEFT_TORIGHT           26
-// UNUSED_LEFT_TORIGHT           27
+// RGB LED
+#define RGB_LED_BLUE             25
+#define RGB_LED_GREEN            26
+#define RGB_LED_RED              27  
 
 
 // common Motor data
@@ -101,6 +102,11 @@ void setup() {
   motorHochRunter.begin(true, PWM_MOTOR_FREQUENCY, PWM_MOTOR_RESOLUTION);
   motorLaufkatze.begin(true, PWM_MOTOR_FREQUENCY, PWM_MOTOR_RESOLUTION);
 
+  //ledcAttachPin(RGB_LED_RED, PWM_CHANNEL_DREHEN);
+  pinMode(RGB_LED_GREEN, OUTPUT);                // Bluetooth state green
+  pinMode(RGB_LED_BLUE, OUTPUT);                 // Bluetooth state blue
+  pinMode(RGB_LED_RED, OUTPUT);                  // Bluetooth state red
+
   Serial.begin(115200);
   PS4.attach(notify);
   PS4.attachOnConnect(onConnect);
@@ -157,6 +163,14 @@ void handleConnectedController()
 
   if (PS4.PSButton())
     removePairedDevices();
+
+
+  digitalWrite(RGB_LED_BLUE, PS4.Circle() ? HIGH : LOW);
+  digitalWrite(RGB_LED_GREEN, PS4.Triangle() ? HIGH : LOW);
+  digitalWrite(RGB_LED_RED, PS4.Square() ? HIGH : LOW);
+
+  if (PS4.R1())
+    PS4.setRumble(10, 50);
 
 
   // Servo
