@@ -22,7 +22,9 @@
 // Bluetooth LED
 #define LED_BLUE                 12
 
-// UNUSED_LEFT_TORIGHT           33
+// Buzzer
+//#define BUZZER                   33
+
 // RGB LED
 #define RGB_LED_BLUE             25
 #define RGB_LED_GREEN            26
@@ -153,8 +155,8 @@ double GetPwmJoystickValue(int16_t joystickValue)
 void handleConnectedController()
 {
   double pwmPercentDrehen = GetPwmPercentValue(PS4.LStickX());
-  double pwmPercentHochRunter = GetPwmPercentValue(PS4.LStickY());
-  double pwmPercentLaufkatze = GetPwmPercentValue(PS4.RStickY());
+  double pwmPercentHochRunter = GetPwmPercentValue(PS4.RStickY());
+  double pwmPercentLaufkatze = GetPwmPercentValue(PS4.LStickY());
   
   // motoren
   motorDrehen.SetMotorSpeed(pwmPercentDrehen);
@@ -205,16 +207,11 @@ void handleDisConnectedController()
       motorHochRunter.SetMotorSpeed(0);
     
 
-    //Serial.print("PWM X: ");
-    //Serial.print(joyX);
-    //Serial.print(": ");
-    //Serial.print(pwmJoyX);
-    //Serial.print("   PWM Y: ");
-    //Serial.print(joyY);
-    //Serial.print(": ");
-    //Serial.print(pwmJoyY);
-    //Serial.print("   Switch: ");
-    //Serial.println(digitalRead(JOYSTICK_SWITCH));
+    //Serial.print("PWM X: ");       Serial.print(joyX);
+    //Serial.print(": ");            Serial.print(pwmJoyX);
+    //Serial.print("   PWM Y: ");    Serial.print(joyY);
+    //Serial.print(": ");            Serial.print(pwmJoyY);
+    //Serial.print("   Switch: ");   Serial.println(digitalRead(JOYSTICK_SWITCH));
 }
 
 
@@ -246,7 +243,7 @@ void loop()
 {
   HandleJoyStickButton();
 
-  if (millis() - lastTimeStampPWM > 100)
+  if (millis() - lastTimeStampPWM > 80)
   {
     lastTimeStampPWM = millis();
 
