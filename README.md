@@ -46,3 +46,7 @@ The crane is controlled using an ESP32 ESP32 NodeMCU, which controlls three DC m
 | 39              | Joystick x              | Drehen                  |
 | 34              | Joystick y              | Laufkatze               |
 | 32              | Joystick switch         | Hoch/Runter             |
+| **RGB LED**                                                         |
+| 25              | Rot                     |                         |
+| 26              | Grün                    |                         |
+| 27              | Blau                    |                         |

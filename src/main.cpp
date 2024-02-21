@@ -12,11 +12,9 @@
 #define HOST_PS4_ADDRESS     "2c:9e:00:e9:c0:3e"
 
 // Unused
-//#define LED_RED                23
 //#define PWM_SERVO_PIN          22
 //#define PWM_FREQUENCY          50
 //#define PWM_RESOLUTION          8
-//#define PWM_CHANNEL_LED         3
 //#define PWM_CHANNEL_SERVO       4
 
 // Bluetooth LED
@@ -79,6 +77,8 @@ unsigned long lastJoyButtonChanged_ms = 0;
 bool joyStickButtonState = false;
 int pwmJoyStickButton = 80;
 
+// LED output attached to pwm
+bool isLedAttached = false;
 
 // put function declarations here:
 void removePairedDevices();
@@ -86,6 +86,7 @@ void printDeviceAddress();
 void notify();
 void onConnect();
 void onDisConnect();
+void HandleLED();
 
 void setup() {
   // put your setup code here, to run once:
@@ -93,11 +94,8 @@ void setup() {
   pinMode(JOYSTICK_SWITCH, INPUT_PULLUP);   // Joystick button
 
   //ledcSetup(PWM_CHANNEL_SERVO, PWM_FREQUENCY, PWM_RESOLUTION);
-  //ledcSetup(PWM_CHANNEL_LED, PWM_FREQUENCY, PWM_RESOLUTION);
   //ledcAttachPin(PWM_SERVO_PIN, PWM_CHANNEL_SERVO);
-  //ledcAttachPin(LED_RED, PWM_CHANNEL_LED);
   //ledcWrite(PWM_CHANNEL_SERVO, 0);
-  //ledcWrite(PWM_CHANNEL_LED, 0);
 
   // Motoren
   motorDrehen.begin(true, PWM_MOTOR_FREQUENCY, PWM_MOTOR_RESOLUTION);
@@ -151,9 +149,14 @@ double GetPwmJoystickValue(int16_t joystickValue)
 }
 
 
-
 void handleConnectedController()
 {
+  if (PS4.PSButton())
+  {
+    removePairedDevices();
+    return;
+  }
+
   double pwmPercentDrehen = GetPwmPercentValue(PS4.LStickX());
   double pwmPercentHochRunter = GetPwmPercentValue(PS4.RStickY());
   double pwmPercentLaufkatze = GetPwmPercentValue(PS4.LStickY());
@@ -163,35 +166,49 @@ void handleConnectedController()
   motorHochRunter.SetMotorSpeed(pwmPercentHochRunter);
   motorLaufkatze.SetMotorSpeed(pwmPercentLaufkatze);
 
-  if (PS4.PSButton())
-    removePairedDevices();
-
-
-  digitalWrite(RGB_LED_BLUE, PS4.Circle() ? HIGH : LOW);
-  digitalWrite(RGB_LED_GREEN, PS4.Triangle() ? HIGH : LOW);
-  digitalWrite(RGB_LED_RED, PS4.Square() ? HIGH : LOW);
-
-  if (PS4.R1())
-    PS4.setRumble(10, 50);
-
+  HandleLED();
 
   // Servo
   //double pwm = pwmPercent < 0 ? 2.5 : (2.5 + (pwmPercent / 10.0));
   //ledcWrite(PWM_CHANNEL_SERVO, (int)(pwm * 255.0 / 100.0));
-
-  // LED
-  //ledcWrite(PWM_CHANNEL_LED, abs((int)(pwmPercent * 255.0 / 100.0)));
 }
 
 
+void HandleLED()
+{
+  double pwmPercentDrehen = motorDrehen.GetCurrentMotorSpeed();
+  double pwmPercentHochRunter = motorHochRunter.GetCurrentMotorSpeed();
+  double pwmPercentLaufkatze = motorLaufkatze.GetCurrentMotorSpeed();
+
+  if (pwmPercentDrehen == 0 && pwmPercentHochRunter == 0 && pwmPercentLaufkatze == 0)
+  {
+    if (isLedAttached)
+    {
+      ledcDetachPin(RGB_LED_BLUE);
+      ledcDetachPin(RGB_LED_RED);
+      ledcDetachPin(RGB_LED_GREEN);
+      isLedAttached = false;
+    }
+    digitalWrite(RGB_LED_BLUE, PS4.Circle() ? HIGH : LOW);
+    digitalWrite(RGB_LED_GREEN, PS4.Triangle() ? HIGH : LOW);
+    digitalWrite(RGB_LED_RED, PS4.Square() ? HIGH : LOW);
+  }
+  else
+  {
+    if (!isLedAttached)
+    {
+      ledcAttachPin(RGB_LED_BLUE, PWM_CHANNEL_DREHEN);
+      ledcAttachPin(RGB_LED_GREEN, PWM_CHANNEL_HOCHRUNTER);
+      ledcAttachPin(RGB_LED_RED, PWM_CHANNEL_LAUFKATZE);
+      isLedAttached = true;
+    }
+  }
+}
+
 void handleDisConnectedController()
 {
-    motorDrehen.SetMotorSpeed(0);
-    motorHochRunter.SetMotorSpeed(0);
-    motorLaufkatze.SetMotorSpeed(0);
     //ledcWrite(PWM_CHANNEL_LED, 0);
     //ledcWrite(PWM_CHANNEL_SERVO, 2.5*255.0 / 100.0);
-
     uint16_t joyX = analogRead(JOYSTICK_X);
     uint16_t joyY = analogRead(JOYSTICK_Y);
 
@@ -206,7 +223,7 @@ void handleDisConnectedController()
     else
       motorHochRunter.SetMotorSpeed(0);
     
-
+    HandleLED();
     //Serial.print("PWM X: ");       Serial.print(joyX);
     //Serial.print(": ");            Serial.print(pwmJoyX);
     //Serial.print("   PWM Y: ");    Serial.print(joyY);
