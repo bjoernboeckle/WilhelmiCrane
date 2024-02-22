@@ -78,7 +78,9 @@ bool joyStickButtonState = false;
 int pwmJoyStickButton = 80;
 
 // LED output attached to pwm
-bool isLedAttached = false;
+bool isRedLedAttached = false;
+bool isGreenLedAttached = false;
+bool isBlueLedAttached = false;
 
 // put function declarations here:
 void removePairedDevices();
@@ -166,13 +168,32 @@ void handleConnectedController()
   motorHochRunter.SetMotorSpeed(pwmPercentHochRunter);
   motorLaufkatze.SetMotorSpeed(pwmPercentLaufkatze);
 
-  HandleLED();
-
   // Servo
   //double pwm = pwmPercent < 0 ? 2.5 : (2.5 + (pwmPercent / 10.0));
   //ledcWrite(PWM_CHANNEL_SERVO, (int)(pwm * 255.0 / 100.0));
 }
 
+
+void HandleLedColorByPWM(double pwmValue, int pwmChannel, int pin, bool &isLEDAttached, bool buttonPressed)
+{
+  if (pwmValue == 0)
+  {
+    if (isLEDAttached)
+    {
+      ledcDetachPin(pin);
+      isLEDAttached = false;
+    }
+    digitalWrite(pin, buttonPressed ? HIGH : LOW);
+  }
+  else
+  {
+    if (!isLEDAttached)
+    {
+      ledcAttachPin(pin, pwmChannel);
+      isLEDAttached = true;
+    }
+  }
+}
 
 void HandleLED()
 {
@@ -180,29 +201,9 @@ void HandleLED()
   double pwmPercentHochRunter = motorHochRunter.GetCurrentMotorSpeed();
   double pwmPercentLaufkatze = motorLaufkatze.GetCurrentMotorSpeed();
 
-  if (pwmPercentDrehen == 0 && pwmPercentHochRunter == 0 && pwmPercentLaufkatze == 0)
-  {
-    if (isLedAttached)
-    {
-      ledcDetachPin(RGB_LED_BLUE);
-      ledcDetachPin(RGB_LED_RED);
-      ledcDetachPin(RGB_LED_GREEN);
-      isLedAttached = false;
-    }
-    digitalWrite(RGB_LED_BLUE, PS4.Circle() ? HIGH : LOW);
-    digitalWrite(RGB_LED_GREEN, PS4.Triangle() ? HIGH : LOW);
-    digitalWrite(RGB_LED_RED, PS4.Square() ? HIGH : LOW);
-  }
-  else
-  {
-    if (!isLedAttached)
-    {
-      ledcAttachPin(RGB_LED_BLUE, PWM_CHANNEL_DREHEN);
-      ledcAttachPin(RGB_LED_GREEN, PWM_CHANNEL_HOCHRUNTER);
-      ledcAttachPin(RGB_LED_RED, PWM_CHANNEL_LAUFKATZE);
-      isLedAttached = true;
-    }
-  }
+  HandleLedColorByPWM(pwmPercentDrehen, PWM_CHANNEL_DREHEN, RGB_LED_RED, isRedLedAttached, PS4.Circle() );
+  HandleLedColorByPWM(pwmPercentHochRunter, PWM_CHANNEL_HOCHRUNTER, RGB_LED_GREEN, isGreenLedAttached, PS4.Triangle() );
+  HandleLedColorByPWM(pwmPercentLaufkatze, PWM_CHANNEL_LAUFKATZE, RGB_LED_BLUE, isBlueLedAttached, PS4.Square() );
 }
 
 void handleDisConnectedController()
@@ -223,7 +224,6 @@ void handleDisConnectedController()
     else
       motorHochRunter.SetMotorSpeed(0);
     
-    HandleLED();
     //Serial.print("PWM X: ");       Serial.print(joyX);
     //Serial.print(": ");            Serial.print(pwmJoyX);
     //Serial.print("   PWM Y: ");    Serial.print(joyY);
@@ -271,6 +271,7 @@ void loop()
       handleDisConnectedController();
       digitalWrite(LED_BLUE, !digitalRead(LED_BLUE));
     }
+    HandleLED();
   }
 }
 
