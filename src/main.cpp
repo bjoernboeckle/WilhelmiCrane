@@ -1,8 +1,10 @@
 #include <Arduino.h>
-
+#include <map>
 #include <L293D.h>
-
 #include <PS4Controller.h>
+
+#include "Communications.h"
+
 #include "esp_bt_main.h"
 #include "esp_bt_device.h"
 #include "esp_gap_bt_api.h"
@@ -24,6 +26,11 @@
 //#define BUZZER                   33
 
 // RGB LED
+#define PWM_FREQUENCY           150
+#define PWM_RESOLUTION            8
+#define PWM_CHANNEL_RED           3
+#define PWM_CHANNEL_GREEN         4
+#define PWM_CHANNEL_BLUE          5
 #define RGB_LED_BLUE             25
 #define RGB_LED_GREEN            26
 #define RGB_LED_RED              27  
@@ -34,19 +41,19 @@
 #define PWM_MOTOR_RESOLUTION      8
 
 // Motor Drehen
-#define PWM_CHANNEL_DREHEN        0
+#define PWM_CHANNEL_DREHEN        6
 #define DREHEN_ENABLE            23
 #define DREHEN_1                 22
 #define DREHEN_2                 21
 
 // Motor Hoch/Runter
-#define PWM_CHANNEL_HOCHRUNTER    3
-#define HOCHRUNTER_ENABLE        05
+#define PWM_CHANNEL_HOCHRUNTER    1
+#define HOCHRUNTER_ENABLE         5
 #define HOCHRUNTER_1             18
 #define HOCHRUNTER_2             19
 
 // Motor Laufkatze
-#define PWM_CHANNEL_LAUFKATZE     4
+#define PWM_CHANNEL_LAUFKATZE     2
 #define LAUFKATZE_ENABLE          2
 #define LAUFKATZE_1               4
 #define LAUFKATZE_2               0
@@ -55,7 +62,8 @@
 #define JOYSTICK_X               39
 #define JOYSTICK_Y               34
 #define JOYSTICK_SWITCH          32
-// UNUSED_LEFT                   35
+
+#define BLUETOOTH_SELECT         35
 
 
 unsigned long lastTimeStamp = 0;
@@ -64,7 +72,6 @@ unsigned long lastTimeStampPWM = 0;
 #define BUTTONS 0
 #define JOYSTICKS 1
 #define SENSORS 0
-
 
 
 L293D motorDrehen(DREHEN_1, DREHEN_2, DREHEN_ENABLE, PWM_CHANNEL_DREHEN);
@@ -77,10 +84,7 @@ unsigned long lastJoyButtonChanged_ms = 0;
 bool joyStickButtonState = false;
 int pwmJoyStickButton = 80;
 
-// LED output attached to pwm
-bool isRedLedAttached = false;
-bool isGreenLedAttached = false;
-bool isBlueLedAttached = false;
+
 
 // put function declarations here:
 void removePairedDevices();
@@ -90,10 +94,98 @@ void onConnect();
 void onDisConnect();
 void HandleLED();
 
-void setup() {
+
+
+#define FIRMWARE_VERSION  "1.0.0"
+#define BLUETOOTH_VISIBLE_NAME "WilhelmiCrane"
+
+// pointer to a void function
+typedef void (*void_ptr)(int pin, bool state);
+
+bool IsBTClientConnected = false;
+int BTredValue = 0;
+int BTgreenValue = 0;
+int BTblueValue = 0;
+int BTDrehenValue = 0;
+int BTHochRunterValue = 0;
+int BTLaufkatzeValue = 0;
+String inputBuffer;
+
+
+
+// Handle Bluetooth events
+void BT_EventHandler(esp_spp_cb_event_t event, esp_spp_cb_param_t *param) {
+  if (event == ESP_SPP_START_EVT) {
+    Serial.println("Bluetooth Initialized...");
+  }
+  else if (event == ESP_SPP_SRV_OPEN_EVT ) {
+    IsBTClientConnected = true;
+    inputBuffer.clear();
+    Serial.println("BT Client connected");
+  }
+  else if (event == ESP_SPP_CLOSE_EVT  ) {
+    IsBTClientConnected = false;
+    inputBuffer.clear();
+    Serial.println("BT Client disconnected");
+  }
+  else if (event == ESP_SPP_DATA_IND_EVT ) {
+    // INCOMING DATA HANDLED HERE...
+    bool eof = false;
+
+    // Save any input bytes to buffer
+    while (SerialBT.available()) 
+    {
+      // Read a character from the input (may be many characters to read)
+      char incoming = SerialBT.read();
+
+      // is the current character NOT a CR ('\r')? 
+      if(!(eof = incoming == '\r'))
+      {
+        // a return character ('\r') defines the end of a packet
+        // if no return is received, just continue to get data
+        inputBuffer += incoming;
+        continue;
+      }
+    }
+
+    // packet is not full (no CR was rcvd), so just return
+    if(!eof) return;
+
+    // Process a full packet, CR was found
+    inputBuffer.toUpperCase();
+
+    // Take a look at what's in the buffer
+    Serial.println(inputBuffer);
+
+    if (inputBuffer.startsWith("RED="))
+      sscanf(&inputBuffer[4], "%d", &BTredValue);
+    else if (inputBuffer.startsWith("GREEN="))
+      sscanf(&inputBuffer[6], "%d", &BTgreenValue);
+    else if (inputBuffer.startsWith("BLUE="))
+      sscanf(&inputBuffer[5], "%d", &BTblueValue);
+
+    else if (inputBuffer.startsWith("DREHEN="))
+      sscanf(&inputBuffer[7], "%d", &BTDrehenValue);
+    else if (inputBuffer.startsWith("HOCH="))
+      sscanf(&inputBuffer[5], "%d", &BTHochRunterValue);
+    else if (inputBuffer.startsWith("LAUFKATZE="))
+      sscanf(&inputBuffer[10], "%d", &BTLaufkatzeValue);
+
+
+    // Clear the input to be ready for another command
+    inputBuffer.clear();
+  }
+}
+
+
+
+void setup() 
+{
   // put your setup code here, to run once:
   pinMode(LED_BLUE, OUTPUT);                // Bluetooth state
   pinMode(JOYSTICK_SWITCH, INPUT_PULLUP);   // Joystick button
+  pinMode(BLUETOOTH_SELECT, INPUT);         // Joystick button
+  
 
   //ledcSetup(PWM_CHANNEL_SERVO, PWM_FREQUENCY, PWM_RESOLUTION);
   //ledcAttachPin(PWM_SERVO_PIN, PWM_CHANNEL_SERVO);
@@ -104,20 +196,37 @@ void setup() {
   motorHochRunter.begin(true, PWM_MOTOR_FREQUENCY, PWM_MOTOR_RESOLUTION);
   motorLaufkatze.begin(true, PWM_MOTOR_FREQUENCY, PWM_MOTOR_RESOLUTION);
 
-  //ledcAttachPin(RGB_LED_RED, PWM_CHANNEL_DREHEN);
+  
+  pinMode(RGB_LED_RED, OUTPUT);                  // Bluetooth state red
   pinMode(RGB_LED_GREEN, OUTPUT);                // Bluetooth state green
   pinMode(RGB_LED_BLUE, OUTPUT);                 // Bluetooth state blue
-  pinMode(RGB_LED_RED, OUTPUT);                  // Bluetooth state red
+  ledcSetup(PWM_CHANNEL_RED, PWM_FREQUENCY, PWM_RESOLUTION);
+  ledcSetup(PWM_CHANNEL_GREEN, PWM_FREQUENCY, PWM_RESOLUTION);
+  ledcSetup(PWM_CHANNEL_BLUE, PWM_FREQUENCY, PWM_RESOLUTION);
+  ledcAttachPin(RGB_LED_RED, PWM_CHANNEL_RED);
+  ledcAttachPin(RGB_LED_GREEN, PWM_CHANNEL_GREEN);
+  ledcAttachPin(RGB_LED_BLUE, PWM_CHANNEL_BLUE);
 
   Serial.begin(115200);
-  PS4.attach(notify);
-  PS4.attachOnConnect(onConnect);
-  PS4.attachOnDisconnect(onDisConnect);
-  PS4.begin(HOST_PS4_ADDRESS);
-  removePairedDevices(); // This helps to solve connection issues
-  Serial.print("This device MAC is: ");
-  printDeviceAddress();
-  Serial.println("");  
+  
+  delay(500);
+
+  if (digitalRead(BLUETOOTH_SELECT))
+  {
+    PS4.attach(notify);
+    PS4.attachOnConnect(onConnect);
+    PS4.attachOnDisconnect(onDisConnect);      
+    PS4.begin(HOST_PS4_ADDRESS);
+    removePairedDevices(); // This helps to solve connection issues
+    Serial.print("PS4 Mode: This device MAC is: ");
+    printDeviceAddress();
+    Serial.println("");
+  }
+  else
+  {
+    Serial.print("APP Mode: ");
+    InitBluetooth(BLUETOOTH_VISIBLE_NAME, BT_EventHandler);   
+  }
 }
 
 
@@ -174,41 +283,26 @@ void handleConnectedController()
 }
 
 
-void HandleLedColorByPWM(double pwmValue, int pwmChannel, int pin, bool &isLEDAttached, bool buttonPressed)
+
+void HandleLedColor(double pwmValue, int pwmChannel, bool buttonPressed, int btValue)
 {
   if (pwmValue == 0)
-  {
-    if (isLEDAttached)
-    {
-      ledcDetachPin(pin);
-      isLEDAttached = false;
-    }
-    digitalWrite(pin, buttonPressed ? HIGH : LOW);
-  }
+    ledcWrite(pwmChannel, (IsBTClientConnected ? btValue : (buttonPressed ? 255 : 0) ) );
   else
-  {
-    if (!isLEDAttached)
-    {
-      ledcAttachPin(pin, pwmChannel);
-      isLEDAttached = true;
-    }
-  }
+    ledcWrite(pwmChannel, abs(pwmValue) * 255 / 100);
 }
 
 void HandleLED()
 {
-  double pwmPercentDrehen = motorDrehen.GetCurrentMotorSpeed();
-  double pwmPercentHochRunter = motorHochRunter.GetCurrentMotorSpeed();
-  double pwmPercentLaufkatze = motorLaufkatze.GetCurrentMotorSpeed();
-
-  HandleLedColorByPWM(pwmPercentDrehen, PWM_CHANNEL_DREHEN, RGB_LED_RED, isRedLedAttached, PS4.Circle() );
-  HandleLedColorByPWM(pwmPercentHochRunter, PWM_CHANNEL_HOCHRUNTER, RGB_LED_GREEN, isGreenLedAttached, PS4.Triangle() );
-  HandleLedColorByPWM(pwmPercentLaufkatze, PWM_CHANNEL_LAUFKATZE, RGB_LED_BLUE, isBlueLedAttached, PS4.Square() );
+  HandleLedColor(motorDrehen.GetCurrentMotorSpeed(), PWM_CHANNEL_RED, PS4.Circle(), BTredValue);
+  HandleLedColor(motorHochRunter.GetCurrentMotorSpeed(), PWM_CHANNEL_GREEN, PS4.Triangle(), BTgreenValue);
+  HandleLedColor(motorLaufkatze.GetCurrentMotorSpeed(), PWM_CHANNEL_BLUE, PS4.Square(), BTblueValue);
 }
+
+
 
 void handleDisConnectedController()
 {
-    //ledcWrite(PWM_CHANNEL_LED, 0);
     //ledcWrite(PWM_CHANNEL_SERVO, 2.5*255.0 / 100.0);
     uint16_t joyX = analogRead(JOYSTICK_X);
     uint16_t joyY = analogRead(JOYSTICK_Y);
@@ -231,7 +325,13 @@ void handleDisConnectedController()
     //Serial.print("   Switch: ");   Serial.println(digitalRead(JOYSTICK_SWITCH));
 }
 
-
+void handleBTConnected()
+{
+    // motoren
+    motorDrehen.SetMotorSpeed(BTDrehenValue);
+    motorLaufkatze.SetMotorSpeed(BTLaufkatzeValue);
+    motorHochRunter.SetMotorSpeed(BTHochRunterValue);
+}
 
 
 void HandleJoyStickButton()
@@ -256,16 +356,21 @@ void HandleJoyStickButton()
 }
 
 
+
 void loop() 
 {
   HandleJoyStickButton();
-
   if (millis() - lastTimeStampPWM > 80)
   {
     lastTimeStampPWM = millis();
 
     if(PS4.isConnected()) 
       handleConnectedController();
+    else if(IsBTClientConnected)
+    {
+      digitalWrite(LED_BLUE, HIGH);
+      handleBTConnected();
+    }
     else
     {
       handleDisConnectedController();
