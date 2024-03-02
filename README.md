@@ -5,12 +5,14 @@ An automated crane controlled by a PS4 remote controller.
 <p float="left">
 <img src="Crane.png" alt="logo" style="width:100px;margin: 5px"/>
 <img src="psControllerColored.png" alt="logo" style="width:100px;margin: 5px"/>
+<img src="smartphone-mobile-icon.png" alt="logo" style="width:100px;margin: 5px"/>
 </p>
 
 
 The project was created for an 9th degree student project to automate a crane.
 
 The crane can be controlled by a wired connected arduino joystick, or after connecting a PS4 controller using a bluetooth Playstation controller.
+In the last update also a playstion app was added which can be used as an alternatove to the PS4 controller, also allowing to chnange the RGB Color values.
 
 The motors support the analog controll by using PWM motor controll.
 
@@ -30,6 +32,7 @@ The crane is controlled using an ESP32 ESP32 NodeMCU, which controlls three DC m
 | **ESP32 - Pin** | **Komponente**          | **Funktion**            |
 |-----------------|-------------------------|-------------------------|
 | 12              | Blaue LED               | Verbindungsstatus       |
+| 35              | Schalter                | Mode (PS4 oder App)     |
 | **Drehen**                                                          |
 | 23              | L293D Oben Enable 1,2   | PWM                     |
 | 22              | L293D Oben Input 1      | Links                   |
