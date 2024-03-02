@@ -1,6 +1,6 @@
 # WilhelmiCrane-esp32
 
-An automated crane controlled by a PS4 remote controller.
+An automated crane controlled by a PS4 remote controller or android app.
 
 <p float="left">
 <img src="Crane.png" alt="logo" style="width:100px;margin: 5px"/>
