@@ -57,12 +57,12 @@
 #define BLUETOOTH_SELECT         35
 
 
-unsigned long lastTimeStamp = 0;
 unsigned long lastTimeStampPWM = 0;
 #define EVENTS 0
 #define BUTTONS 0
 #define JOYSTICKS 1
 #define SENSORS 0
+
 
 
 BluetoothControl BluetoothApp;
@@ -80,11 +80,13 @@ int pwmJoyStickButton = 80;
 
 
 // put function declarations here:
+bool IsPs4Mode = false;
 void removePairedDevices();
 void printDeviceAddress();
 void onConnect();
 void onDisConnect();
 void HandleLED();
+void InitBluetoothMode(bool exitCurMode = false);
 
 
 void setup() 
@@ -119,7 +121,30 @@ void setup()
   
   delay(500);
 
-  if (digitalRead(BLUETOOTH_SELECT))
+  InitBluetoothMode();
+}
+
+
+void InitBluetoothMode(bool exitCurMode)
+{
+  if (exitCurMode)
+  {
+    if (IsPs4Mode)
+    {
+      ESP.restart();  // PS4 exit doesn't work
+      removePairedDevices();
+      PS4.end();
+      Serial.println("PS4 Mode stopped");
+    }
+    else
+    {
+      BluetoothApp.end();
+      Serial.println("Bluetooth App stopped");
+    }
+  }
+
+  IsPs4Mode = digitalRead(BLUETOOTH_SELECT);
+  if (IsPs4Mode)
   {
     PS4.attachOnConnect(onConnect);
     PS4.attachOnDisconnect(onDisConnect);      
@@ -135,6 +160,7 @@ void setup()
     BluetoothApp.begin();
   }
 }
+
 
 
 double GetPwmPercentValue(int8_t stickValue)
@@ -283,6 +309,11 @@ void loop()
       digitalWrite(LED_BLUE, !digitalRead(LED_BLUE));
     }
     HandleLED();
+
+    if (IsPs4Mode != digitalRead(BLUETOOTH_SELECT) )
+    {
+      InitBluetoothMode(true);
+    }
   }
 }
 

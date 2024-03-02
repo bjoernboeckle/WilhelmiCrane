@@ -18,6 +18,7 @@ class BluetoothControl
 public:
     BluetoothControl();
     bool begin();
+    bool end();
 
 
     bool IsBTClientConnected;
@@ -33,6 +34,7 @@ public:
     void BT_EventHandler(esp_spp_cb_event_t event, esp_spp_cb_param_t *param);
 
 private:
+    BluetoothSerial SerialBT;   // Bluetooth Serial Object (Handle)
     bool btScanSync = false;
     void InitBluetooth(const char * btName, esp_spp_cb_t handler);
 };

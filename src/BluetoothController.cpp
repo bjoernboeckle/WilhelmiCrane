@@ -2,11 +2,8 @@
 #include "BluetoothController.h"
 
 
-static BluetoothSerial SerialBT;   // Bluetooth Serial Object (Handle)
-
 static BluetoothControl* g_BluetoothApp = NULL;
 void g_BT_EventHandler(esp_spp_cb_event_t event, esp_spp_cb_param_t *param) { g_BluetoothApp->BT_EventHandler(event, param); }
-
 
 
 BluetoothControl::BluetoothControl()
@@ -23,13 +20,21 @@ BluetoothControl::BluetoothControl()
 bool BluetoothControl::begin()
 {
     if (g_BluetoothApp != NULL)
-    {
       return false;
-    }
 
     g_BluetoothApp = this;
     InitBluetooth(BLUETOOTH_VISIBLE_NAME, g_BT_EventHandler);
     return true;
+}
+
+
+bool BluetoothControl::end()
+{
+  if (g_BluetoothApp == NULL)
+    return false;
+
+  SerialBT.end();
+  g_BluetoothApp = NULL;
 }
 
 void BluetoothControl::InitBluetooth(const char * btName, esp_spp_cb_t handler) 
@@ -66,8 +71,6 @@ void BluetoothControl::InitBluetooth(const char * btName, esp_spp_cb_t handler)
         SerialBT.register_callback(handler); 
     }
 }
-
-
 
 
 
