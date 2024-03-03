@@ -45,9 +45,9 @@
 
 // Motor Laufkatze
 #define PWM_CHANNEL_LAUFKATZE     2
-#define LAUFKATZE_ENABLE          2
-#define LAUFKATZE_1               4
-#define LAUFKATZE_2               0
+#define LAUFKATZE_ENABLE         15
+#define LAUFKATZE_1               2
+#define LAUFKATZE_2               4
 
 // Joystick
 #define JOYSTICK_X               39
@@ -74,6 +74,7 @@ L293D motorLaufkatze(LAUFKATZE_1, LAUFKATZE_2, LAUFKATZE_ENABLE, PWM_CHANNEL_LAU
 
 
 // debounce joystick button, revert pwm afer each press
+bool IsJoyStickEnabled = false;
 unsigned long lastJoyButtonChanged_ms = 0;
 bool joyStickButtonState = false;
 int pwmJoyStickButton = 80;
@@ -87,6 +88,8 @@ void onConnect();
 void onDisConnect();
 void HandleLED();
 void InitBluetoothMode(bool exitCurMode = false);
+bool CheckJoystickHelath();
+double GetPwmJoystickValue(int16_t joystickValue);
 
 
 void setup() 
@@ -94,7 +97,7 @@ void setup()
   // put your setup code here, to run once:
   pinMode(LED_BLUE, OUTPUT);                // Bluetooth state
   pinMode(JOYSTICK_SWITCH, INPUT_PULLUP);   // Joystick button
-  pinMode(BLUETOOTH_SELECT, INPUT);         // Joystick button
+  pinMode(BLUETOOTH_SELECT, INPUT);         // Bluetooth switch
   
 
   //ledcSetup(PWM_CHANNEL_SERVO, PWM_FREQUENCY, PWM_RESOLUTION);
@@ -119,9 +122,32 @@ void setup()
 
   Serial.begin(115200);
   
-  delay(500);
+  IsJoyStickEnabled = CheckJoystickHelath();
+  
+  InitBluetoothMode(false);
+}
 
-  InitBluetoothMode();
+
+bool CheckJoystickHelath()
+{
+    bool curJoyButtonStart = (digitalRead(JOYSTICK_SWITCH) == 0);
+    double pwmJoyXStart =  GetPwmJoystickValue(analogRead(JOYSTICK_X));
+    double pwmJoyYStart =  GetPwmJoystickValue(analogRead(JOYSTICK_Y));
+    
+    for(int i=0; i<20; i++)
+    {
+      delay(10);
+      if ( curJoyButtonStart != (digitalRead(JOYSTICK_SWITCH) == 0) ||
+           pwmJoyXStart != GetPwmJoystickValue(analogRead(JOYSTICK_X)) ||
+           pwmJoyYStart != GetPwmJoystickValue(analogRead(JOYSTICK_Y)) )
+      {
+        Serial.println("Joystick health failed - disabled!");
+        return false;
+      }
+    }
+
+    Serial.println("Joystick health ok - enabled!");
+    return true;
 }
 
 
@@ -232,26 +258,28 @@ void HandleLED()
 
 void handleDisConnectedController()
 {
-    //ledcWrite(PWM_CHANNEL_SERVO, 2.5*255.0 / 100.0);
-    uint16_t joyX = analogRead(JOYSTICK_X);
-    uint16_t joyY = analogRead(JOYSTICK_Y);
+    if (IsJoyStickEnabled)
+    {
+      uint16_t joyX = analogRead(JOYSTICK_X);
+      uint16_t joyY = analogRead(JOYSTICK_Y);
 
-    double pwmJoyX =  GetPwmJoystickValue(joyX);
-    double pwmJoyY =  GetPwmJoystickValue(joyY);
+      double pwmJoyX =  GetPwmJoystickValue(joyX);
+      double pwmJoyY =  GetPwmJoystickValue(joyY);
 
-    // motoren
-    motorDrehen.SetMotorSpeed(pwmJoyX);
-    motorLaufkatze.SetMotorSpeed(pwmJoyY);
-    if (joyStickButtonState)
-      motorHochRunter.SetMotorSpeed(pwmJoyStickButton);
-    else
-      motorHochRunter.SetMotorSpeed(0);
+      // motoren
+      motorDrehen.SetMotorSpeed(pwmJoyX);
+      motorLaufkatze.SetMotorSpeed(pwmJoyY);
+      if (joyStickButtonState)
+        motorHochRunter.SetMotorSpeed(pwmJoyStickButton);
+      else
+        motorHochRunter.SetMotorSpeed(0);
     
-    //Serial.print("PWM X: ");       Serial.print(joyX);
-    //Serial.print(": ");            Serial.print(pwmJoyX);
-    //Serial.print("   PWM Y: ");    Serial.print(joyY);
-    //Serial.print(": ");            Serial.print(pwmJoyY);
-    //Serial.print("   Switch: ");   Serial.println(digitalRead(JOYSTICK_SWITCH));
+      //Serial.print("PWM X: ");       Serial.print(joyX);
+      //Serial.print(": ");            Serial.print(pwmJoyX);
+      //Serial.print("   PWM Y: ");    Serial.print(joyY);
+      //Serial.print(": ");            Serial.print(pwmJoyY);
+      //Serial.print("   Switch: ");   Serial.println(digitalRead(JOYSTICK_SWITCH));
+    }
 }
 
 void handleBTConnected()

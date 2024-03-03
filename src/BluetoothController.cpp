@@ -35,6 +35,7 @@ bool BluetoothControl::end()
 
   SerialBT.end();
   g_BluetoothApp = NULL;
+  IsBTClientConnected = false;
 }
 
 void BluetoothControl::InitBluetooth(const char * btName, esp_spp_cb_t handler) 

@@ -42,9 +42,9 @@ The crane is controlled using an ESP32 ESP32 NodeMCU, which controlls three DC m
 | 18              | L293D Oben Input 3      | Runter                  |
 | 19              | L293D Oben Input 4      | Hoch                    |
 | **Laufkatze**                                                       |
-| 2               | L293D Unten Enable 1,2  | PWM                     |
-| 4               | L293D Unten Input 1     | Vor                     |
-| 0               | L293D Unten Input 2     | Zurück                  |
+| 15              | L293D Unten Enable 1,2  | PWM                     |
+| 2               | L293D Unten Input 1     | Vor                     |
+| 4               | L293D Unten Input 2     | Zurück                  |
 | **Joystick**                                                        |
 | 39              | Joystick x              | Drehen                  |
 | 34              | Joystick y              | Laufkatze               |
